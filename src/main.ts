@@ -1,15 +1,89 @@
+import { getCardName, getStartSeedString, onSetSeed } from "isaacscript-common";
+import * as seeds from "./seeds.json";
+
+// Constants
+const MOD_NAME = "isaac-seed-checker";
+const VERBOSE = true;
+
+// Variables
+let seedIndex = -1;
+let restartOnNextFrame = false;
+
 export function main(): void {
-  // Instantiate a new mod object, which grants the ability to add callback functions that
-  // correspond to in-game events
-  const mod = RegisterMod("isaacSeedChecker", 1);
+  const mod = RegisterMod(MOD_NAME, 1);
 
-  // Set a callback function that corresponds to when a new run is started
-  mod.AddCallback(ModCallbacks.MC_POST_GAME_STARTED, postGameStarted);
+  mod.AddCallback(ModCallbacks.MC_POST_RENDER, postRender); // 2
+  mod.AddCallback(ModCallbacks.MC_POST_GAME_STARTED, postGameStarted); // 15
 
-  // Print an initialization message to the "log.txt" file
-  Isaac.DebugString("isaac-seed-checker initialized.");
+  Isaac.DebugString(`${MOD_NAME} initialized.`);
 }
 
-function postGameStarted() {
-  Isaac.DebugString("Callback triggered: MC_POST_GAME_STARTED");
+// ModCallbacks.MC_POST_RENDER (2)
+function postRender() {
+  if (!restartOnNextFrame) {
+    return;
+  }
+  restartOnNextFrame = false;
+
+  seedIndex += 1;
+  const seed = seeds[seedIndex];
+  if (seed === undefined) {
+    Isaac.DebugString("Done checking all of the seeds!");
+  } else {
+    Isaac.ExecuteCommand(`seed ${seed}`);
+  }
+}
+
+// ModCallbacks.MC_POST_GAME_STARTED (15)
+function postGameStarted(continued: boolean) {
+  const startSeedString = getStartSeedString();
+
+  if (VERBOSE) {
+    Isaac.DebugString(
+      `MC_POST_GAME_STARTED - ${startSeedString} - on set seed: ${onSetSeed()}`,
+    );
+  }
+
+  if (!validateRun(continued)) {
+    return;
+  }
+
+  if (seedIndex >= 0) {
+    const player = Isaac.GetPlayer();
+    player.UseActiveItem(CollectibleType.COLLECTIBLE_DECK_OF_CARDS);
+    const card = player.GetCard(PocketItemSlot.SLOT_1);
+    const cardName = getCardName(card);
+    Isaac.DebugString(`Card: ${cardName}`);
+
+    if (card === Card.CARD_CHAOS) {
+      Isaac.DebugString(`GETTING HERE - CHAOS CARD FOUND - ${startSeedString}`);
+    }
+  }
+
+  restartOnNextFrame = true;
+}
+
+function validateRun(continued: boolean) {
+  const game = Game();
+  const challenge = Isaac.GetChallenge();
+  const player = Isaac.GetPlayer();
+  const character = player.GetPlayerType();
+
+  if (continued) {
+    error(`The ${MOD_NAME} mod will not work when continuing a run.`);
+  }
+
+  if (game.Difficulty !== Difficulty.DIFFICULTY_NORMAL) {
+    error(`The ${MOD_NAME} mod will not work on non-normal difficulties.`);
+  }
+
+  if (challenge !== Challenge.CHALLENGE_NULL) {
+    error(`The ${MOD_NAME} mod will not work on challenges.`);
+  }
+
+  if (character !== PlayerType.PLAYER_EDEN) {
+    error(`The ${MOD_NAME} mod will not work on characters other than Eden.`);
+  }
+
+  return true;
 }

@@ -8,6 +8,9 @@
   "compilerOptions": {
     // Specifies the root folder within your source files
     "rootDir": "./src",
+
+    // Necessary to import the seeds
+    "resolveJsonModule": true,
   },
 
   // A list of the TypeScript files to compile
